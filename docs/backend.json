@@ -1,0 +1,214 @@
+{
+  "entities": {
+    "Client": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Client",
+      "type": "object",
+      "description": "Represents a client whose services are being tracked by the ClientTrack application. This entity stores core client information, subscription details, and payment status.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Client entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the client."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The contact phone number of the client, used for communication."
+        },
+        "market": {
+          "type": "string",
+          "description": "The market segment the client belongs to (e.g., INDIAN, FOREX, BROKER).",
+          "format": "enum",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fee": {
+          "type": "number",
+          "description": "The service fee charged to the client."
+        },
+        "subscriptionStartDate": {
+          "type": "string",
+          "description": "The date when the client's current subscription started.",
+          "format": "date-time"
+        },
+        "subscriptionEndDate": {
+          "type": "string",
+          "description": "The date when the client's current subscription is set to end.",
+          "format": "date-time"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "The current payment status of the client's subscription.",
+          "format": "enum",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalPaid": {
+          "type": "number",
+          "description": "The cumulative total amount paid by the client across all payments."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the client record was first created.",
+          "format": "date-time"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "A flag indicating whether the client record has been soft-deleted and moved to the recycle bin."
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp when the client record was soft-deleted.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "phone",
+        "market",
+        "fee",
+        "subscriptionStartDate",
+        "subscriptionEndDate",
+        "paymentStatus",
+        "totalPaid",
+        "createdAt",
+        "deleted",
+        "deletedAt"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Records individual payment transactions made by a client, detailing the amount, date, and validity period covered by each payment.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the Client who made this payment. (Relationship: Client 1:N Payment)"
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "The date and time when the payment was recorded.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of this specific payment."
+        },
+        "validityDays": {
+          "type": "number",
+          "description": "The number of days of service validity this payment covers."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The effective start date of the subscription period covered by this payment.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The effective end date of the subscription period covered by this payment.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "paymentDate",
+        "amount",
+        "validityDays",
+        "startDate",
+        "endDate"
+      ]
+    },
+    "Settings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Settings",
+      "type": "object",
+      "description": "Stores application-wide configuration settings, such as WhatsApp message templates, to centralize and easily manage configurable parameters.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Settings entity. Expected to be a singular document, e.g., 'whatsapp_template'."
+        },
+        "whatsappTemplate": {
+          "type": "string",
+          "description": "The template string for generating WhatsApp messages, supporting variables like {{name}}, {{market}}, {{fee}}, and {{expiry_date}}."
+        }
+      },
+      "required": [
+        "id",
+        "whatsappTemplate"
+      ]
+    }
+  },
+  "auth": {
+    "providers": []
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/clients/{clientId}",
+        "definition": {
+          "entityName": "Client",
+          "schema": {
+            "$ref": "#/backend/entities/Client"
+          },
+          "description": "Contains core information for each client, including personal details, subscription terms, payment status, and a soft-delete flag.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "The unique identifier for the client, serving as the document ID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Records individual payment transactions associated with a specific client. This is a subcollection under a client, allowing for direct retrieval of all payments for a given client.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "The unique identifier of the parent client document."
+            },
+            {
+              "name": "paymentId",
+              "description": "The unique identifier for the specific payment transaction, serving as the document ID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/settings/{settingId}",
+        "definition": {
+          "entityName": "Settings",
+          "schema": {
+            "$ref": "#/backend/entities/Settings"
+          },
+          "description": "Stores application-wide configuration settings, such as WhatsApp message templates.",
+          "params": [
+            {
+              "name": "settingId",
+              "description": "The unique identifier for the settings document (e.g., 'whatsapp_template')."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to be simple and flexible, now that authentication has been removed."
+  }
+}
