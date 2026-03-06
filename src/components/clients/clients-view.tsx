@@ -1,7 +1,8 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, doc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { collection, onSnapshot, query, doc, serverTimestamp, where, updateDoc, orderBy } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
 import type { Client, Payment } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,7 @@ export default function PaymentsView({ redirectToMarket, setRedirectToMarket }: 
   const [activeTab, setActiveTab] = useState<Market | 'ALL'>('INDIAN');
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
 
   useEffect(() => {
     if (redirectToMarket) {
@@ -93,9 +95,12 @@ export default function PaymentsView({ redirectToMarket, setRedirectToMarket }: 
   }, [redirectToMarket, setRedirectToMarket]);
 
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !user) {
+        setLoading(false);
+        return;
+    };
     setLoading(true);
-    const q = query(collection(firestore, 'clients'), where('deleted', '==', false));
+    const q = query(collection(firestore, 'users', user.uid, 'clients'), where('deleted', '==', false));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const clientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
       clientsData.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
@@ -107,12 +112,12 @@ export default function PaymentsView({ redirectToMarket, setRedirectToMarket }: 
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [firestore, toast]);
+  }, [firestore, user, toast]);
   
   const handleSoftDelete = async (clientId: string) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     setActionLoading(clientId);
-    const clientRef = doc(firestore, 'clients', clientId);
+    const clientRef = doc(firestore, 'users', user.uid, 'clients', clientId);
     
     try {
         await updateDoc(clientRef, {
@@ -365,12 +370,13 @@ export const HistorySheet = ({ client, open, onOpenChange }: { client: Client | 
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!client || !firestore) return;
+        if (!client || !firestore || !user) return;
         setLoading(true);
-        const paymentsQuery = query(collection(firestore, 'clients', client.id, 'payments'), orderBy('paymentDate', 'desc'));
+        const paymentsQuery = query(collection(firestore, 'users', user.uid, 'clients', client.id, 'payments'), orderBy('paymentDate', 'desc'));
 
         const unsubscribe = onSnapshot(paymentsQuery, (snapshot) => {
             const paymentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
@@ -383,7 +389,7 @@ export const HistorySheet = ({ client, open, onOpenChange }: { client: Client | 
         });
 
         return () => unsubscribe();
-    }, [client, firestore, toast]);
+    }, [client, firestore, user, toast]);
 
     if (!client) return null;
 

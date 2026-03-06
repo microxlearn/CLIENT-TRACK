@@ -1,3 +1,4 @@
+
 'use client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Client } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { LoaderCircle } from 'lucide-react';
 import type { Market } from '@/app/page';
 
@@ -35,6 +36,7 @@ export function ClientForm({ isOpen, setIsOpen, client, onSave }: ClientFormProp
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const marketFees = {
     INDIAN: 600,
@@ -85,7 +87,7 @@ export function ClientForm({ isOpen, setIsOpen, client, onSave }: ClientFormProp
   }, [market, client, form]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     
     if (values.market !== 'BROKER' && values.validity === 'custom' && (!values.customValidity || values.customValidity <= 0)) {
         form.setError('customValidity', { message: 'Please enter a valid number of days.' });
@@ -99,7 +101,7 @@ export function ClientForm({ isOpen, setIsOpen, client, onSave }: ClientFormProp
     let savedClient: Client;
     
     if (client) { // Editing existing client
-      const clientRef = doc(firestore, 'clients', client.id);
+      const clientRef = doc(firestore, 'users', user.uid, 'clients', client.id);
       const updatedData = {
           name: values.name,
           phone: fullPhoneNumber,
@@ -117,7 +119,7 @@ export function ClientForm({ isOpen, setIsOpen, client, onSave }: ClientFormProp
       const endDate = new Date();
       endDate.setDate(startDate.getDate() + validityDays);
 
-      const clientRef = doc(collection(firestore, 'clients'));
+      const clientRef = doc(collection(firestore, 'users', user.uid, 'clients'));
       const clientId = clientRef.id;
 
       const newClientData = {
@@ -135,12 +137,13 @@ export function ClientForm({ isOpen, setIsOpen, client, onSave }: ClientFormProp
         deletedAt: null,
       };
       batch.set(clientRef, newClientData);
-      savedClient = newClientData;
+      savedClient = newClientData as Client;
 
       if (fee > 0) {
-          const paymentRef = doc(collection(firestore, 'clients', clientId, 'payments'));
+          const paymentRef = doc(collection(firestore, 'users', user.uid, 'clients', clientId, 'payments'));
           const newPaymentData = {
             id: paymentRef.id,
+            userId: user.uid,
             clientId: clientId,
             paymentDate: Timestamp.now(),
             amount: fee,

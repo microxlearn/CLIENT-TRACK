@@ -4,7 +4,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import {
   LayoutDashboard,
   CreditCard,
-  History,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,14 +17,14 @@ interface BottomNavProps {
 const navItems: { view: View; label: string; icon: React.ElementType }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'payments', label: 'Payments', icon: CreditCard },
-  { view: 'history', label: 'History', icon: History },
   { view: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function BottomNav({ activeView, setActiveView }: BottomNavProps) {
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-10 border-t bg-card/95 backdrop-blur-sm md:hidden">
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-4 items-center justify-around">
+      <div className="mx-auto grid h-16 max-w-lg grid-cols-3 items-center justify-around">
         {navItems.map((item) => (
           <button
             key={item.view}

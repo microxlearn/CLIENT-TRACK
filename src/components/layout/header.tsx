@@ -1,8 +1,12 @@
+
 'use client';
-import { Plus, Trash } from "lucide-react";
+import { Plus, Trash, LogOut } from "lucide-react";
 import { Button } from "../ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   onAddMemberClick?: () => void;
@@ -18,6 +22,7 @@ interface HeaderProps {
   };
   onClearHistoryClick?: () => void;
   showClearHistoryButton?: boolean;
+  showSignOutButton?: boolean;
 }
 
 export default function Header({ 
@@ -28,7 +33,16 @@ export default function Header({
     liveToggleHandlers,
     onClearHistoryClick,
     showClearHistoryButton,
+    showSignOutButton,
 }: HeaderProps) {
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-card px-4 shadow-sm md:justify-end md:px-6">
       <div className="flex items-center gap-2 md:hidden">
@@ -60,6 +74,13 @@ export default function Header({
             <Plus className="mr-2 h-4 w-4" />
             Add Member
           </Button>
+        )}
+
+        {showSignOutButton && (
+           <Button onClick={handleSignOut} variant="outline" size="sm">
+             <LogOut className="mr-2 h-4 w-4" />
+             Sign Out
+           </Button>
         )}
       </div>
     </header>

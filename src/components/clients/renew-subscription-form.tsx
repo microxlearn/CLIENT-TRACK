@@ -1,3 +1,4 @@
+
 'use client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Client } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { collection, doc, writeBatch, Timestamp, increment } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { LoaderCircle } from 'lucide-react';
 import { addDays, format, isBefore } from 'date-fns';
 
@@ -32,6 +33,7 @@ export function RenewSubscriptionForm({ isOpen, setIsOpen, client }: RenewFormPr
   const [isLoading, setIsLoading] = useState(false);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,7 +61,6 @@ export function RenewSubscriptionForm({ isOpen, setIsOpen, client }: RenewFormPr
       const today = new Date();
       const currentSubscriptionEndDate = client.subscriptionEndDate.toDate();
 
-      // Case 1: Client is active or expiry is today
       const renewalStartDate = isBefore(currentSubscriptionEndDate, today)
         ? today // Expired: start from today
         : currentSubscriptionEndDate; // Active: start from current end date
@@ -72,7 +73,7 @@ export function RenewSubscriptionForm({ isOpen, setIsOpen, client }: RenewFormPr
   }, [validity, customValidity, client]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
 
     const validityDays = values.validity === 'custom' ? values.customValidity! : parseInt(values.validity, 10);
     if (values.validity === 'custom' && (!values.customValidity || values.customValidity <= 0)) {
@@ -91,9 +92,10 @@ export function RenewSubscriptionForm({ isOpen, setIsOpen, client }: RenewFormPr
     const newEndDate = addDays(newStartDate, validityDays);
     
     // 1. Create a new payment record
-    const paymentRef = doc(collection(firestore, `clients/${client.id}/payments`));
+    const paymentRef = doc(collection(firestore, `users/${user.uid}/clients/${client.id}/payments`));
     const newPaymentData = {
       id: paymentRef.id,
+      userId: user.uid,
       clientId: client.id,
       paymentDate: Timestamp.now(),
       amount: values.amount,
@@ -104,7 +106,7 @@ export function RenewSubscriptionForm({ isOpen, setIsOpen, client }: RenewFormPr
     batch.set(paymentRef, newPaymentData);
 
     // 2. Update the client document
-    const clientRef = doc(firestore, 'clients', client.id);
+    const clientRef = doc(firestore, 'users', user.uid, 'clients', client.id);
     const updatedClientData = {
       subscriptionStartDate: Timestamp.fromDate(newStartDate),
       subscriptionEndDate: Timestamp.fromDate(newEndDate),

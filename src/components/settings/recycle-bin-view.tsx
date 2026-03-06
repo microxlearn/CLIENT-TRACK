@@ -1,7 +1,8 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, writeBatch, getDocs, updateDoc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle, Trash, Undo } from 'lucide-react';
@@ -21,13 +22,14 @@ export function RecycleBinView({ isOpen, setIsOpen }: RecycleBinProps) {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!firestore || !isOpen) return;
+        if (!firestore || !isOpen || !user) return;
 
         setLoading(true);
-        const q = query(collection(firestore, 'clients'), where('deleted', '==', true));
+        const q = query(collection(firestore, 'users', user.uid, 'clients'), where('deleted', '==', true));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const clientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
@@ -48,12 +50,12 @@ export function RecycleBinView({ isOpen, setIsOpen }: RecycleBinProps) {
         });
 
         return () => unsubscribe();
-    }, [firestore, isOpen, toast]);
+    }, [firestore, isOpen, user, toast]);
 
     const handleRestore = (clientId: string) => {
-        if (!firestore) return;
+        if (!firestore || !user) return;
         setActionLoading(`restore-${clientId}`);
-        const clientRef = doc(firestore, 'clients', clientId);
+        const clientRef = doc(firestore, 'users', user.uid, 'clients', clientId);
 
         updateDoc(clientRef, {
             deleted: false,
@@ -72,11 +74,11 @@ export function RecycleBinView({ isOpen, setIsOpen }: RecycleBinProps) {
     };
 
     const handlePermanentDelete = (clientId: string) => {
-        if (!firestore) return;
+        if (!firestore || !user) return;
         setActionLoading(`delete-${clientId}`);
         
-        const clientRef = doc(firestore, 'clients', clientId);
-        const paymentsRef = collection(firestore, 'clients', clientId, 'payments');
+        const clientRef = doc(firestore, 'users', user.uid, 'clients', clientId);
+        const paymentsRef = collection(firestore, 'users', user.uid, 'clients', clientId, 'payments');
 
         getDocs(paymentsRef)
             .then(paymentsSnapshot => {

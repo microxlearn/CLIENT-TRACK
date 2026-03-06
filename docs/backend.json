@@ -1,5 +1,37 @@
+
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User Profile",
+      "type": "object",
+      "description": "Stores basic user profile information, created on sign-up.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID from Firebase Authentication."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for authentication and password resets.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "isLive": {
+            "type": "boolean",
+            "description": "Indicates if the user's account is active. If false, the user sees a 'validity expired' message."
+        },
+        "isAdmin": {
+            "type": "boolean",
+            "description": "Indicates if the user has administrative privileges."
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
     "Client": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Client",
@@ -78,8 +110,7 @@
         "paymentStatus",
         "totalPaid",
         "createdAt",
-        "deleted",
-        "deletedAt"
+        "deleted"
       ]
     },
     "Payment": {
@@ -91,6 +122,10 @@
         "id": {
           "type": "string",
           "description": "Unique identifier for the Payment entity."
+        },
+        "userId": {
+            "type": "string",
+            "description": "The ID of the user who owns this payment record, used for security rules."
         },
         "clientId": {
           "type": "string",
@@ -122,6 +157,7 @@
       },
       "required": [
         "id",
+        "userId",
         "clientId",
         "paymentDate",
         "amount",
@@ -152,63 +188,49 @@
     }
   },
   "auth": {
-    "providers": []
+    "providers": ["email-password"]
   },
   "firestore": {
     "structure": [
-      {
-        "path": "/clients/{clientId}",
-        "definition": {
-          "entityName": "Client",
-          "schema": {
-            "$ref": "#/backend/entities/Client"
-          },
-          "description": "Contains core information for each client, including personal details, subscription terms, payment status, and a soft-delete flag.",
-          "params": [
-            {
-              "name": "clientId",
-              "description": "The unique identifier for the client, serving as the document ID."
+        {
+            "path": "/users/{userId}",
+            "definition": {
+                "entityName": "UserProfile",
+                "schema": { "$ref": "#/backend/entities/UserProfile"},
+                "description": "Stores profile information for each application user."
             }
-          ]
-        }
+        },
+        {
+            "path": "/users/{userId}/clients/{clientId}",
+            "definition": {
+              "entityName": "Client",
+              "schema": {
+                "$ref": "#/backend/entities/Client"
+              },
+              "description": "Contains core information for each client, scoped to a specific user."
+            }
+        },
+        {
+            "path": "/users/{userId}/clients/{clientId}/payments/{paymentId}",
+            "definition": {
+              "entityName": "Payment",
+              "schema": {
+                "$ref": "#/backend/entities/Payment"
+              },
+              "description": "Records individual payment transactions associated with a specific client, under a specific user."
+            }
       },
       {
-        "path": "/clients/{clientId}/payments/{paymentId}",
-        "definition": {
-          "entityName": "Payment",
-          "schema": {
-            "$ref": "#/backend/entities/Payment"
-          },
-          "description": "Records individual payment transactions associated with a specific client. This is a subcollection under a client, allowing for direct retrieval of all payments for a given client.",
-          "params": [
-            {
-              "name": "clientId",
-              "description": "The unique identifier of the parent client document."
-            },
-            {
-              "name": "paymentId",
-              "description": "The unique identifier for the specific payment transaction, serving as the document ID."
+            "path": "/users/{userId}/settings/{settingId}",
+            "definition": {
+              "entityName": "Settings",
+              "schema": {
+                "$ref": "#/backend/entities/Settings"
+              },
+              "description": "Stores application-wide configuration settings for a specific user."
             }
-          ]
-        }
-      },
-      {
-        "path": "/settings/{settingId}",
-        "definition": {
-          "entityName": "Settings",
-          "schema": {
-            "$ref": "#/backend/entities/Settings"
-          },
-          "description": "Stores application-wide configuration settings, such as WhatsApp message templates.",
-          "params": [
-            {
-              "name": "settingId",
-              "description": "The unique identifier for the settings document (e.g., 'whatsapp_template')."
-            }
-          ]
-        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to be simple and flexible, now that authentication has been removed."
+    "reasoning": "The Firestore structure is designed to support multi-tenancy by scoping all major data collections (clients, payments, settings) under a top-level 'users' collection. This ensures that each user's data is isolated and can be secured with Firestore rules."
   }
 }

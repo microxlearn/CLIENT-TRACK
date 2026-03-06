@@ -2,21 +2,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: Rules are wide open. Anyone can read, write, and delete any data.
-    match /admins/{adminId} {
-      allow read, write: if true;
-    }
-    match /clients/{clientId} {
-      allow read, write: if true;
-    }
     
-    // This rule is required for collection group queries on 'payments'.
-    match /{path=**}/payments/{paymentId} {
-      allow read, write: if true;
+    function isAdmin() {
+      // This function checks if the currently authenticated user has an 'isAdmin' flag
+      // set to true in their user document. It returns false if the document or flag
+      // doesn't exist. This function relies on the security rules allowing the user
+      // to read their own document.
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    match /settings/{settingId} {
-      allow read, write: if true;
+    // Rule for the entire 'users' collection
+    match /users {
+      // Only admins are allowed to list all documents in the 'users' collection.
+      // This rule requires the 'isAdmin()' function to perform a 'get' on a single user
+      // document, which should be permitted by the rule on /users/{userId}.
+      allow list: if request.auth != null && isAdmin();
+    }
+
+    // Rules for individual documents within the 'users' collection
+    match /users/{userId} {
+      // A user can create, read, and modify their own profile document.
+      allow get, update, delete: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+
+      // An admin can update any user's profile. This is for toggling 'isLive' etc.
+      allow update: if request.auth != null && isAdmin();
+
+      // Nested collections for clients and settings, scoped to the user
+      match /clients/{clientId} {
+        allow read, write, delete: if request.auth.uid == userId;
+      }
+      
+      match /settings/{settingId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Rules for the 'payments' collection group (applies to all 'payments' subcollections)
+    match /{path=**}/payments/{paymentId} {
+      // An authenticated user can query across the 'payments' collection group.
+      // Firestore's backend automatically combines this with the 'get' rule below to
+      // ensure users only see documents they are authorized to read.
+      allow list: if request.auth != null;
+
+      // A user can perform single-document reads/writes only on their own payment documents.
+      // The 'in' operator safely checks for the existence of the 'userId' field.
+      allow get, update, delete: if request.auth != null && 
+                                    'userId' in resource.data && 
+                                    resource.data.userId == request.auth.uid;
+                                    
+      // A user can only create payment documents that are correctly assigned to them.
+      allow create: if request.auth != null && 
+                       'userId' in request.resource.data &&
+                       request.resource.data.userId == request.auth.uid;
     }
   }
 }

@@ -1,46 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser, useFirestore } from '@/firebase';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { useMemoFirebase } from '@/firebase/provider';
+import { doc } from 'firebase/firestore';
+import type { UserProfile } from '@/lib/types';
+
 import Header from '@/components/layout/header';
 import BottomNav from '@/components/layout/bottom-nav';
 import Sidebar from '@/components/layout/sidebar';
 import DashboardView from '@/components/dashboard/dashboard-view';
 import PaymentsView from '@/components/clients/clients-view';
-import HistoryView from '@/components/admins/admins-view';
 import SettingsView from '@/components/settings/settings-view';
 import { ClientForm } from '@/components/clients/client-form';
 import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
+import FullScreenLoader from '@/components/layout/full-screen-loader';
 
-export type View = 'dashboard' | 'payments' | 'history' | 'settings';
+export type View = 'dashboard' | 'payments' | 'settings';
 export type Market = 'INDIAN' | 'FOREX' | 'BROKER';
 
-export default function Home() {
+function HomePageContent() {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [redirectToMarket, setRedirectToMarket] = useState<Market | null>(null);
   const [isClientFormOpen, setIsClientFormOpen] = useState(false);
-  const [isLiveOn, setIsLiveOn] = useState(true);
+  
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+  const firestore = useFirestore();
 
-  // Initialize and synchronize state from localStorage
+  const userProfileRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  // Auth Guard and Admin Redirect
   useEffect(() => {
-    const syncLiveStatus = () => {
-      const storedStatus = localStorage.getItem('liveStatus');
-      setIsLiveOn(storedStatus !== 'off');
-    };
+    if (isUserLoading || isProfileLoading) return;
 
-    // Sync on initial mount
-    syncLiveStatus();
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
 
-    // Add listeners for cross-tab changes and window focus
-    window.addEventListener('storage', syncLiveStatus);
-    window.addEventListener('focus', syncLiveStatus);
+    if (userProfile?.isAdmin) {
+      router.replace('/admin/dashboard');
+      return;
+    }
+  }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
-    // Cleanup listeners
-    return () => {
-      window.removeEventListener('storage', syncLiveStatus);
-      window.removeEventListener('focus', syncLiveStatus);
-    };
-  }, []); // Only runs once on mount to set up listeners
 
   const renderView = () => {
     switch (activeView) {
@@ -48,8 +56,6 @@ export default function Home() {
         return <DashboardView />;
       case 'payments':
         return <PaymentsView redirectToMarket={redirectToMarket} setRedirectToMarket={setRedirectToMarket} />;
-      case 'history':
-        return <HistoryView />;
       case 'settings':
         return <SettingsView />;
       default:
@@ -61,7 +67,11 @@ export default function Home() {
     setIsClientFormOpen(false);
   };
 
-  if (!isLiveOn) {
+  if (isUserLoading || !user || isProfileLoading || userProfile?.isAdmin) {
+    return <FullScreenLoader />;
+  }
+
+  if (userProfile && userProfile.isLive === false) {
     const whatsappUrl = `https://wa.me/919745275297?text=${encodeURIComponent('validity expired')}`;
     return (
         <div className="flex h-dvh w-full flex-col items-center justify-center gap-6 bg-background">
@@ -78,10 +88,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar activeView={activeView} setActiveView={setActiveView} />
+      <Sidebar 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+      />
       <div className="md:pl-60">
         <Header 
           onAddMemberClick={() => setIsClientFormOpen(true)}
+          showSignOutButton={activeView === 'settings'}
         />
         <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
@@ -89,7 +103,10 @@ export default function Home() {
             </div>
         </main>
       </div>
-      <BottomNav activeView={activeView} setActiveView={setActiveView} />
+      <BottomNav 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+      />
       <ClientForm
         isOpen={isClientFormOpen}
         setIsOpen={setIsClientFormOpen}
@@ -97,5 +114,15 @@ export default function Home() {
         onSave={handleClientCreate}
       />
     </div>
+  );
+}
+
+
+export default function Home() {
+  // useSearchParams requires a Suspense boundary.
+  return (
+    <Suspense fallback={<FullScreenLoader />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

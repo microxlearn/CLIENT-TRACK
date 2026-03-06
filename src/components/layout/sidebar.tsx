@@ -4,7 +4,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import {
   LayoutDashboard,
   CreditCard,
-  History,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,7 +18,6 @@ interface SidebarProps {
 const navItems: { view: View; label: string; icon: React.ElementType }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'payments', label: 'Payments', icon: CreditCard },
-  { view: 'history', label: 'History', icon: History },
   { view: 'settings', label: 'Settings', icon: Settings },
 ];
 

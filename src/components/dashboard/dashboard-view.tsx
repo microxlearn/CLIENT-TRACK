@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -9,7 +10,7 @@ import {
   doc,
   orderBy,
 } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { useMemoFirebase } from '@/firebase/provider';
 import type { Client, Payment } from '@/lib/types';
@@ -29,12 +30,13 @@ const HistorySheet = ({ client, open, onOpenChange }: { client: Client | null, o
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!client || !firestore) return;
+        if (!client || !firestore || !user) return;
         setLoading(true);
-        const paymentsQuery = query(collection(firestore, 'clients', client.id, 'payments'), orderBy('paymentDate', 'desc'));
+        const paymentsQuery = query(collection(firestore, 'users', user.uid, 'clients', client.id, 'payments'), orderBy('paymentDate', 'desc'));
 
         const unsubscribe = onSnapshot(paymentsQuery, (snapshot) => {
             const paymentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
@@ -47,7 +49,7 @@ const HistorySheet = ({ client, open, onOpenChange }: { client: Client | null, o
         });
 
         return () => unsubscribe();
-    }, [client, firestore, toast]);
+    }, [client, firestore, user, toast]);
 
     if (!client) return null;
 
@@ -250,15 +252,18 @@ export default function DashboardView() {
   const [historyClient, setHistoryClient] = useState<Client | null>(null);
   
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   
-  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'whatsapp_template') : null, [firestore]);
+  const settingsRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'users', user.uid, 'settings', 'whatsapp_template') : null, [firestore, user]);
   const { data: settingsData } = useDoc(settingsRef);
 
-
   useEffect(() => {
-    if (!firestore) return;
-    const q = query(collection(firestore, 'clients'), where('deleted', '==', false));
+    if (!firestore || !user) {
+      setLoading(false);
+      return;
+    }
+    const q = query(collection(firestore, 'users', user.uid, 'clients'), where('deleted', '==', false));
     const unsubscribe = onSnapshot(
       q,
       (querySnapshot) => {
@@ -276,7 +281,7 @@ export default function DashboardView() {
     );
 
     return () => unsubscribe();
-  }, [firestore]);
+  }, [firestore, user]);
   
   const { kpis, pendingClientsList, expiringClientsList } = useMemo(() => {
     const totalClients = clients.length;
@@ -528,5 +533,3 @@ export default function DashboardView() {
     </div>
   );
 }
-
-    

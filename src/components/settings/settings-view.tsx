@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../ui/card';
@@ -6,7 +7,7 @@ import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, setDoc } from 'firebase/firestore';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, updateDocumentNonBlocking, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { LoaderCircle, Moon, Sun, Trash } from 'lucide-react';
 import { useMemoFirebase } from '@/firebase/provider';
@@ -23,10 +24,11 @@ export default function SettingsView() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
 
-  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'whatsapp_template') : null, [firestore]);
+  const settingsRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'users', user.uid, 'settings', 'whatsapp_template') : null, [firestore, user]);
   const { data: settingsData, isLoading: isLoadingSettings } = useDoc(settingsRef);
 
   useEffect(() => {
